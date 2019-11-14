@@ -1,4 +1,4 @@
-# Copyright 2017 Google
+# Copyright 2017 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -117,8 +117,35 @@ add_external_subdirectory(benchmark)
 # Force disable Abseil's tests, which don't compile under VS2017.
 set(old_build_testing ${BUILD_TESTING})
 set(ABSL_RUN_TESTS OFF CACHE BOOL "Disable Abseil tests" FORCE)
-add_external_subdirectory(abseil-cpp)
 
+
+# gRPC
+set(gRPC_BUILD_TESTS OFF CACHE BOOL "Disable gRPC tests")
+set(gRPC_BUILD_CODEGEN OFF CACHE BOOL "Disable gRPC codegen")
+set(gRPC_BUILD_CSHARP_EXT OFF CACHE BOOL "Disable gRPC C# extensions")
+set(gRPC_INSTALL OFF CACHE BOOL "Disable gRPC installation")
+
+set(ABSL_ROOT_DIR ${FIREBASE_EXTERNAL_SOURCE_DIR}/abseil-cpp)
+set(CARES_ROOT_DIR ${FIREBASE_EXTERNAL_SOURCE_DIR}/cares)
+set(PROTOBUF_ROOT_DIR ${FIREBASE_EXTERNAL_SOURCE_DIR}/protobuf)
+
+find_package(OpenSSL QUIET)
+if(OPENSSL_FOUND)
+  set(gRPC_SSL_PROVIDER package CACHE STRING "Use external OpenSSL")
+else()
+  set(BORINGSSL_ROOT_DIR ${FIREBASE_EXTERNAL_SOURCE_DIR}/boringssl)
+endif()
+
+find_package(ZLIB QUIET)
+if(ZLIB_FOUND)
+  set(gRPC_ZLIB_PROVIDER package CACHE STRING "Use external ZLIB")
+else()
+  set(ZLIB_ROOT_DIR ${FIREBASE_EXTERNAL_SOURCE_DIR}/zlib)
+endif()
+
+add_external_subdirectory(grpc)
+
+# Fix up targets included by gRPC's build
 if(CXX_CLANG)
   target_compile_options(
     absl_time_zone
@@ -138,39 +165,7 @@ if(MSVC)
   )
 endif()
 
-
-# gRPC
-find_package(OpenSSL QUIET)
-if(OPENSSL_FOUND)
-  set(gRPC_SSL_PROVIDER package CACHE STRING "Use external OpenSSL")
-endif()
-
-find_package(ZLIB QUIET)
-if(ZLIB_FOUND)
-  set(gRPC_ZLIB_PROVIDER package CACHE STRING "Use external ZLIB")
-endif()
-
-set(gRPC_BUILD_TESTS OFF CACHE BOOL "Disable gRPC tests")
-add_external_subdirectory(grpc)
-
-# Fix up targets included by gRPC's build
-if(OPENSSL_FOUND)
-  # gRPC's CMakeLists.txt does not account for finding OpenSSL in a directory
-  # that's not in the default search path.
-  target_include_directories(grpc PRIVATE ${OPENSSL_INCLUDE_DIR})
-
-  if(CXX_CLANG OR CXX_GNU)
-    if((OPENSSL_VERSION VERSION_EQUAL "1.1.0") OR
-       (OPENSSL_VERSION VERSION_GREATER "1.1.0"))
-      # gRPC uses some features deprecated in OpenSSL 1.1.0
-      target_compile_options(
-        grpc
-        PRIVATE -Wno-deprecated-declarations
-      )
-    endif()
-  endif()
-
-else()
+if(NOT OPENSSL_FOUND)
   # Not using outboard OpenSSL so set up BoringSSL to look like it.
   add_alias(OpenSSL::Crypto crypto)
   target_include_directories(
