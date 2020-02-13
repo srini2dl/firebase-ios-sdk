@@ -71,6 +71,8 @@ cc_select(
 cc_library(
   firebase_firestore_util_base_stdio
   SOURCES
+  stacktrace.cc
+  stacktrace.h
     exception.cc
     exception.h
     hard_assert.cc
