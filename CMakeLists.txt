@@ -1,4 +1,4 @@
-# Copyright 2017 Google
+# Copyright 2017 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -221,22 +221,24 @@ add_alias(LevelDB::LevelDB leveldb)
 
 
 # nanopb
-set(nanopb_BUILD_GENERATOR ON CACHE BOOL "Enable the nanopb generator")
-set(nanopb_MSVC_STATIC_RUNTIME OFF CACHE BOOL "Link static runtime libraries")
-add_external_subdirectory(nanopb)
+if(NOT TARGET protobuf-nanopb-static)
+  set(nanopb_BUILD_GENERATOR ON CACHE BOOL "Enable the nanopb generator")
+  set(nanopb_MSVC_STATIC_RUNTIME OFF CACHE BOOL "Link static runtime libraries")
+  add_external_subdirectory(nanopb)
 
-target_compile_definitions(
-  protobuf-nanopb-static
-  PUBLIC -DPB_FIELD_32BIT -DPB_ENABLE_MALLOC
-)
+  target_compile_definitions(
+    protobuf-nanopb-static
+    PUBLIC -DPB_FIELD_32BIT -DPB_ENABLE_MALLOC
+  )
 
-# Enable #include <nanopb/pb.h>
-target_include_directories(
-  protobuf-nanopb-static
-  INTERFACE
-  $<BUILD_INTERFACE:${FIREBASE_EXTERNAL_SOURCE_DIR}>
-  $<BUILD_INTERFACE:${FIREBASE_EXTERNAL_SOURCE_DIR}/nanopb>
-)
+  # Enable #include <nanopb/pb.h>
+  target_include_directories(
+    protobuf-nanopb-static
+    INTERFACE
+    $<BUILD_INTERFACE:${FIREBASE_EXTERNAL_SOURCE_DIR}>
+    $<BUILD_INTERFACE:${FIREBASE_EXTERNAL_SOURCE_DIR}/nanopb>
+  )
+endif()
 
 
 # XCTest
