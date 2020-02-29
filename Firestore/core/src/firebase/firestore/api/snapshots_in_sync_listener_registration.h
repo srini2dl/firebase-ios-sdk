@@ -43,7 +43,7 @@ class SnapshotsInSyncListenerRegistration : public ListenerRegistration {
  public:
   SnapshotsInSyncListenerRegistration(
       std::shared_ptr<core::FirestoreClient> client,
-      std::shared_ptr<core::AsyncEventListener<util::Empty>> async_listener);
+      std::shared_ptr<core::EventListener<util::Empty>> listener);
 
   /**
    * Removes the listener being tracked by this FIRListenerRegistration. After
@@ -53,10 +53,10 @@ class SnapshotsInSyncListenerRegistration : public ListenerRegistration {
 
  private:
   /** The client that was used to register this listen. */
-  std::shared_ptr<core::FirestoreClient> client_;
+  std::weak_ptr<core::FirestoreClient> client_;
 
-  /** The async listener that is used to mute events synchronously. */
-  std::weak_ptr<core::AsyncEventListener<util::Empty>> async_listener_;
+  /** The listener that is used to mute events synchronously. */
+  std::weak_ptr<core::EventListener<util::Empty>> listener_;
 };
 
 }  // namespace api

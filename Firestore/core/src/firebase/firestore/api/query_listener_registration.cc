@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 Google
+ * Copyright 2019 Google LLC
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,24 +23,21 @@ namespace api {
 
 QueryListenerRegistration::QueryListenerRegistration(
     std::shared_ptr<core::FirestoreClient> client,
-    std::shared_ptr<core::AsyncEventListener<core::ViewSnapshot>>
-        async_listener,
     std::shared_ptr<core::QueryListener> query_listener)
     : client_(std::move(client)),
-      async_listener_(std::move(async_listener)),
       query_listener_(std::move(query_listener)) {
 }
 
 void QueryListenerRegistration::Remove() {
-  auto async_listener = async_listener_.lock();
-  if (async_listener) {
-    async_listener->Mute();
-    async_listener_.reset();
-  }
-
   auto query_listener = query_listener_.lock();
   if (query_listener) {
-    client_->RemoveListener(query_listener);
+    // Synchronously dispose of the listener, to prevent events from escaping.
+    query_listener->Dispose();
+
+    auto shared_client = client_.lock();
+    if (shared_client) {
+      shared_client->RemoveListener(query_listener);
+    }
     query_listener_.reset();
   }
 

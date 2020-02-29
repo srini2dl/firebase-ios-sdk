@@ -98,7 +98,6 @@ GrpcStream::GrpcStream(
 }
 
 GrpcStream::~GrpcStream() {
-  LOG_DEBUG("GrpcStream('%s'): destroying stream", this);
   HARD_ASSERT_NOTHROW(completions_.empty(),
                       "GrpcStream is being destroyed without proper shutdown");
   MaybeUnregister();
@@ -160,14 +159,18 @@ void GrpcStream::MaybeWrite(absl::optional<BufferedWrite> maybe_write) {
 }
 
 void GrpcStream::FinishImmediately() {
-  LOG_DEBUG("GrpcStream('%s'): finishing without notifying observers", this);
+  LOG_DEBUG("GrpcStream('%s'): finishing without notifying observers; "
+      "completions: %s, finished: %s",
+      this, completions_.size(), is_grpc_call_finished_);
 
   Shutdown();
   UnsetObserver();
 }
 
 void GrpcStream::FinishAndNotify(const Status& status) {
-  LOG_DEBUG("GrpcStream('%s'): finishing and notifying observers", this);
+  LOG_DEBUG("GrpcStream('%s'): finishing and notifying observers; "
+      "completions: %s, finished: %s",
+      this, completions_.size(), is_grpc_call_finished_);
 
   Shutdown();
 
@@ -181,9 +184,6 @@ void GrpcStream::FinishAndNotify(const Status& status) {
 }
 
 void GrpcStream::Shutdown() {
-  LOG_DEBUG("GrpcStream('%s'): shutting down; completions: %s, is finished: %s",
-            this, completions_.size(), is_grpc_call_finished_);
-
   MaybeUnregister();
 
   // If completions are empty but the call hasn't been finished, it means this
@@ -216,8 +216,6 @@ void GrpcStream::MaybeUnregister() {
 }
 
 void GrpcStream::FinishGrpcCall(const OnSuccess& callback) {
-  LOG_DEBUG("GrpcStream('%s'): finishing the underlying call", this);
-
   HARD_ASSERT(!is_grpc_call_finished_, "FinishGrpcCall called twice");
   is_grpc_call_finished_ = true;
 

@@ -70,7 +70,7 @@ std::function<void()> Expectation::AsCallback() const {
 
 // MARK: - AsyncTest
 
-std::future<void> AsyncTest::Async(std::function<void()> action) const {
+std::future<void> Async(std::function<void()> action) {
   std::packaged_task<void()> task(std::move(action));
   auto future = task.get_future();
 
@@ -79,8 +79,7 @@ std::future<void> AsyncTest::Async(std::function<void()> action) const {
   return future;
 }
 
-void AsyncTest::Await(const std::future<void>& future,
-                      std::chrono::milliseconds timeout) const {
+void Await(const std::future<void>& future, std::chrono::milliseconds timeout) {
   std::future_status result = future.wait_for(timeout);
   if (result == std::future_status::ready) {
     return;
@@ -89,8 +88,8 @@ void AsyncTest::Await(const std::future<void>& future,
   ADD_FAILURE() << "Test timed out after " << timeout.count() << " ms";
 }
 
-void AsyncTest::Await(const std::shared_future<void>& future,
-                      std::chrono::milliseconds timeout) const {
+void Await(const std::shared_future<void>& future,
+           std::chrono::milliseconds timeout) {
   std::future_status result = future.wait_for(timeout);
   if (result == std::future_status::ready) {
     return;
@@ -99,12 +98,12 @@ void AsyncTest::Await(const std::shared_future<void>& future,
   ADD_FAILURE() << "Test timed out after " << timeout.count() << " ms";
 }
 
-void AsyncTest::Await(Expectation& expectation,
-                      std::chrono::milliseconds timeout) const {
+// NOLINTNEXTLINE(runtime/references)
+void Await(Expectation& expectation, std::chrono::milliseconds timeout) {
   return Await(expectation.get_future(), timeout);
 }
 
-void AsyncTest::SleepFor(int millis) const {
+void SleepFor(int millis) {
   std::this_thread::sleep_for(std::chrono::milliseconds(millis));
 }
 

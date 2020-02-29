@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 Google
+ * Copyright 2018 Google LLC
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -24,6 +24,7 @@
 #include "Firestore/core/src/firebase/firestore/util/error_apple.h"
 #include "Firestore/core/src/firebase/firestore/util/hard_assert.h"
 #include "Firestore/core/src/firebase/firestore/util/log.h"
+#include "Firestore/core/src/firebase/firestore/util/statusor.h"
 #include "Firestore/core/src/firebase/firestore/util/string_format.h"
 
 namespace firebase {
@@ -201,9 +202,11 @@ void Stream::OnStreamRead(const grpc::ByteBuffer& message) {
   HARD_ASSERT(IsStarted(), "OnStreamRead called for a stopped stream.");
 
   if (LogIsDebugEnabled()) {
-    LOG_DEBUG("%s headers (whitelisted): %s", GetDebugDescription(),
-              Datastore::GetWhitelistedHeadersAsString(
-                  grpc_stream_->GetResponseHeaders()));
+    std::string headers = Datastore::GetWhitelistedHeadersAsString(
+    grpc_stream_->GetResponseHeaders());
+    if (!headers.empty()) {
+      LOG_DEBUG("%s headers (whitelisted): %s", GetDebugDescription(), headers);
+    }
   }
 
   Status read_status = NotifyStreamResponse(message);
@@ -220,7 +223,6 @@ void Stream::OnStreamRead(const grpc::ByteBuffer& message) {
 
 void Stream::Stop() {
   EnsureOnQueue();
-  LOG_DEBUG("%s stop", GetDebugDescription());
 
   Close(Status::OK());
 }
@@ -266,9 +268,12 @@ void Stream::Close(const Status& status) {
   if (graceful_stop && grpc_stream_) {
     // If the stream is in the auth stage, gRPC stream might not have been
     // created yet.
-    LOG_DEBUG("%s Finishing gRPC stream", GetDebugDescription());
+    LOG_DEBUG("%s Shutting down stream gracefully", GetDebugDescription());
     TearDown(grpc_stream_.get());
+  } else {
+    LOG_DEBUG("%s Shutting down stream hard", GetDebugDescription());
   }
+
   // Step 6 (both): destroy the underlying stream.
   grpc_stream_.reset();
 

@@ -236,11 +236,10 @@ std::unique_ptr<ListenerRegistration> DocumentReference::AddSnapshotListener(
   core::Query query(key_.path());
   std::shared_ptr<QueryListener> query_listener =
       firestore_->client()->ListenToQuery(std::move(query), options,
-                                          async_listener);
+                                          std::move(async_listener));
 
   return absl::make_unique<QueryListenerRegistration>(
-      firestore_->client(), std::move(async_listener),
-      std::move(query_listener));
+      firestore_->client(), std::move(query_listener));
 }
 
 bool operator==(const DocumentReference& lhs, const DocumentReference& rhs) {

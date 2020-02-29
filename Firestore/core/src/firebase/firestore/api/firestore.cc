@@ -134,6 +134,11 @@ void Firestore::RunTransaction(
 }
 
 void Firestore::Terminate(util::StatusCallback callback) {
+  if (client_ && client_->is_terminated()) {
+    callback(Status::OK());
+    return;
+  }
+
   // The client must be initialized to ensure that all subsequent API usage
   // throws an exception.
   EnsureClientConfigured();
@@ -148,7 +153,9 @@ void Firestore::Dispose() {
   if (!client_) return;
 
   client_->Dispose();
-  client_.reset();
+//  client_.reset();
+
+  extension_ = nullptr;
 }
 
 void Firestore::WaitForPendingWrites(util::StatusCallback callback) {
@@ -193,7 +200,9 @@ std::unique_ptr<ListenerRegistration> Firestore::AddSnapshotsInSyncListener(
   EnsureClientConfigured();
   auto async_listener = AsyncEventListener<Empty>::Create(
       client_->user_executor(), std::move(listener));
-  client_->AddSnapshotsInSyncListener(std::move(async_listener));
+
+  client_->AddSnapshotsInSyncListener(async_listener);
+
   return absl::make_unique<SnapshotsInSyncListenerRegistration>(
       client_, std::move(async_listener));
 }

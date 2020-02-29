@@ -57,7 +57,15 @@ class QueryListener {
                 ListenOptions options,
                 ViewSnapshotSharedListener&& listener);
 
+  /**
+   * Destroys this `QueryListener`. Note that this does *not* dispose the
+   * underlying listener. During normal operation, the `EventManager` deletes
+   */
   virtual ~QueryListener() = default;
+
+  /**
+   * Destroys this `QueryListener` and `Mute`s all listeners. */
+  void Dispose();
 
   const Query& query() const {
     return query_;

@@ -1,5 +1,5 @@
 /*
- * Copyright 2017, 2018 Google
+ * Copyright 2017, 2018 Google LLC
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -76,11 +76,9 @@
 
 #include <utility>
 
-#include "Firestore/core/include/firebase/firestore/firestore_errors.h"
 #include "Firestore/core/src/firebase/firestore/util/status.h"
 #include "Firestore/core/src/firebase/firestore/util/statusor_internals.h"
 #include "absl/base/attributes.h"
-#include "absl/strings/string_view.h"
 
 namespace firebase {
 namespace firestore {

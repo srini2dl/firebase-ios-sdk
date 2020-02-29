@@ -31,6 +31,10 @@ EventManager::EventManager(QueryEventSource* query_event_source)
   query_event_source->SetCallback(this);
 }
 
+EventManager::~EventManager() {
+  query_event_source_->SetCallback(nullptr);
+}
+
 model::TargetId EventManager::AddQueryListener(
     std::shared_ptr<core::QueryListener> listener) {
   const Query& query = listener->query();

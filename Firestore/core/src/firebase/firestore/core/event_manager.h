@@ -48,6 +48,8 @@ class EventManager : public SyncEngineCallback {
  public:
   explicit EventManager(QueryEventSource* query_event_source_);
 
+  ~EventManager();
+
   /**
    * Adds a query listener that will be called with new snapshots for the query.
    * The EventManager is responsible for multiplexing many listeners to a single

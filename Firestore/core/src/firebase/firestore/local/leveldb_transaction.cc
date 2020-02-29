@@ -194,6 +194,8 @@ void LevelDbTransaction::Delete(absl::string_view key) {
 
 void LevelDbTransaction::Commit() {
   WriteBatch batch;
+  size_t empty = batch.ApproximateSize();
+
   for (const auto& deletion : deletions_) {
     batch.Delete(deletion);
   }
@@ -201,6 +203,8 @@ void LevelDbTransaction::Commit() {
   for (const auto& entry : mutations_) {
     batch.Put(entry.first, entry.second);
   }
+
+  if (batch.ApproximateSize() == empty) return;
 
   LOG_DEBUG("Committing transaction: %s", ToString());
 

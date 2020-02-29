@@ -68,6 +68,10 @@ QueryListener::QueryListener(Query query,
       listener_(std::move(listener)) {
 }
 
+void QueryListener::Dispose() {
+  listener_->Mute();
+}
+
 bool QueryListener::OnViewSnapshot(ViewSnapshot snapshot) {
   HARD_ASSERT(
       !snapshot.document_changes().empty() || snapshot.sync_state_changed(),

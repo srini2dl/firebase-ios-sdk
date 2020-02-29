@@ -83,7 +83,6 @@ using remote::RemoteStore;
 using remote::Serializer;
 using util::AsyncQueue;
 using util::DelayedConstructor;
-using util::DelayedOperation;
 using util::Empty;
 using util::Executor;
 using util::Path;
@@ -280,19 +279,27 @@ void FirestoreClient::Dispose() {
   // Atomically stop accepting any new tasks and wait for all pending tasks to
   // complete.
   worker_queue_->Dispose();
+  user_executor_->Dispose();
 }
 
 void FirestoreClient::TerminateInternal() {
   if (!remote_store_) return;
 
   credentials_provider_->SetCredentialChangeListener(nullptr);
+  credentials_provider_.reset();
 
   // If we've scheduled LRU garbage collection, cancel it.
   if (lru_callback_) {
     lru_callback_.Cancel();
   }
+
+  local_store_.reset();
+  query_engine_.reset();
+
   remote_store_->Shutdown();
   persistence_->Shutdown();
+
+  event_manager_.reset();
 
   // Clear the remote store to indicate terminate is complete.
   remote_store_.reset();
@@ -353,6 +360,7 @@ void FirestoreClient::RemoveListener(
   if (is_terminated()) {
     return;
   }
+
   auto shared_this = shared_from_this();
   worker_queue()->Enqueue([shared_this, listener] {
     shared_this->event_manager_->RemoveQueryListener(listener);

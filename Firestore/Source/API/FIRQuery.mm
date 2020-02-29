@@ -197,11 +197,10 @@ int32_t SaturatedLimitValue(NSInteger limit) {
       firestore->client()->user_executor(), std::move(view_listener));
 
   std::shared_ptr<QueryListener> query_listener =
-      firestore->client()->ListenToQuery(query, internalOptions, async_listener);
+      firestore->client()->ListenToQuery(query, internalOptions, std::move(async_listener));
 
   return [[FSTListenerRegistration alloc]
       initWithRegistration:absl::make_unique<QueryListenerRegistration>(firestore->client(),
-                                                                        std::move(async_listener),
                                                                         std::move(query_listener))];
 }
 

@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 Google
+ * Copyright 2019 Google LLC
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,18 +18,16 @@
 #define FIRESTORE_CORE_SRC_FIREBASE_FIRESTORE_API_QUERY_LISTENER_REGISTRATION_H_
 
 #include <memory>
-#include <utility>
 
 #include "Firestore/core/src/firebase/firestore/api/listener_registration.h"
-#include "Firestore/core/src/firebase/firestore/core/event_listener.h"
-#include "Firestore/core/src/firebase/firestore/core/query_listener.h"
-#include "Firestore/core/src/firebase/firestore/core/view_snapshot.h"
 
 namespace firebase {
 namespace firestore {
+
 namespace core {
 class FirestoreClient;
-}
+class QueryListener;
+}  // namespace core
 
 namespace api {
 
@@ -41,8 +39,6 @@ class QueryListenerRegistration : public ListenerRegistration {
  public:
   QueryListenerRegistration(
       std::shared_ptr<core::FirestoreClient> client,
-      std::shared_ptr<core::AsyncEventListener<core::ViewSnapshot>>
-          async_listener,
       std::shared_ptr<core::QueryListener> query_listener);
 
   /**
@@ -52,10 +48,7 @@ class QueryListenerRegistration : public ListenerRegistration {
 
  private:
   /** The client that was used to register this listen. */
-  std::shared_ptr<core::FirestoreClient> client_;
-
-  /** The async listener that is used to mute events synchronously. */
-  std::weak_ptr<core::AsyncEventListener<core::ViewSnapshot>> async_listener_;
+  std::weak_ptr<core::FirestoreClient> client_;
 
   /** The internal QueryListener that can be used to unlisten the query. */
   std::weak_ptr<core::QueryListener> query_listener_;

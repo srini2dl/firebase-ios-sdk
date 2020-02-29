@@ -26,19 +26,23 @@ namespace api {
 
 SnapshotsInSyncListenerRegistration::SnapshotsInSyncListenerRegistration(
     std::shared_ptr<core::FirestoreClient> client,
-    std::shared_ptr<core::AsyncEventListener<util::Empty>> async_listener)
-    : client_(std::move(client)), async_listener_(std::move(async_listener)) {
+    std::shared_ptr<core::EventListener<util::Empty>> listener)
+    : client_(std::move(client)), listener_(std::move(listener)) {
 }
 
 void SnapshotsInSyncListenerRegistration::Remove() {
-  auto async_listener = async_listener_.lock();
-  if (async_listener) {
-    async_listener->Mute();
-    async_listener_.reset();
-  }
+  auto listener = listener_.lock();
+  if (listener) {
+    listener->Mute();
 
-  client_->RemoveSnapshotsInSyncListener(async_listener);
-  client_.reset();
+    auto client = client_.lock();
+    if (client) {
+      client->RemoveSnapshotsInSyncListener(listener);
+      client_.reset();
+    }
+
+    listener_.reset();
+  }
 }
 
 }  // namespace api

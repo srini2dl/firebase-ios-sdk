@@ -33,6 +33,8 @@ namespace {
 
 namespace chr = std::chrono;
 
+using testutil::Async;
+using testutil::Await;
 using testutil::Expectation;
 
 DelayedOperation Schedule(Executor* const executor,

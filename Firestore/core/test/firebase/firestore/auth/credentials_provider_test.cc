@@ -16,6 +16,7 @@
 
 #include "Firestore/core/src/firebase/firestore/auth/credentials_provider.h"
 
+#include "Firestore/core/src/firebase/firestore/auth/token.h"
 #include "Firestore/core/src/firebase/firestore/util/statusor.h"
 #include "gtest/gtest.h"
 

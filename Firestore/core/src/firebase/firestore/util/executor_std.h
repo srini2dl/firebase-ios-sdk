@@ -210,9 +210,29 @@ class Schedule {
 // A serial queue that executes provided operations on a dedicated background
 // thread, using C++11 standard library functionality.
 class ExecutorStd : public Executor {
+  struct Entry {
+    Entry() = default;
+
+    Entry(Operation&& operation,
+          const ExecutorStd::Id id,
+          const ExecutorStd::Tag tag = kNoTag)
+        : tagged{tag, std::move(operation)}, id{id} {
+    }
+
+    bool IsImmediate() const {
+      return tagged.tag == kNoTag;
+    }
+
+    static constexpr Tag kNoTag = -1;
+    TaggedOperation tagged;
+    Id id = 0;
+  };
+
  public:
   explicit ExecutorStd(int threads);
   ~ExecutorStd();
+
+  void Dispose() override;
 
   void Execute(Operation&& operation) override;
   void ExecuteBlocking(Operation&& operation) override;
@@ -227,14 +247,11 @@ class ExecutorStd : public Executor {
   bool IsScheduled(Tag tag) const override;
   absl::optional<TaggedOperation> PopFromSchedule() override;
 
-  using TimePoint = async::Schedule<Operation>::TimePoint;
-  // To allow canceling operations, each scheduled operation is assigned
-  // a monotonically increasing identifier.
-  using Id = unsigned int;
+  using TimePoint = async::Schedule<Entry>::TimePoint;
 
   // If the operation hasn't yet been run, it will be removed from the queue.
   // Otherwise, this function is a no-op.
-  void TryCancel(Id operation_id);
+  void Cancel(Id operation_id) override;
 
   Id PushOnSchedule(Operation&& operation, TimePoint when, Tag tag = -1);
 
@@ -251,23 +268,7 @@ class ExecutorStd : public Executor {
     return TimePoint{};
   }
 
-  struct Entry {
-    Entry() {
-    }
-    Entry(Operation&& operation,
-          const ExecutorStd::Id id,
-          const ExecutorStd::Tag tag = kNoTag)
-        : tagged{tag, std::move(operation)}, id{id} {
-    }
-
-    bool IsImmediate() const {
-      return tagged.tag == kNoTag;
-    }
-
-    static constexpr Tag kNoTag = -1;
-    TaggedOperation tagged;
-    Id id = 0;
-  };
+ private:
   // Operations scheduled for immediate execution are also put on the schedule
   // (with due time set to `Immediate`).
   async::Schedule<Entry> schedule_;

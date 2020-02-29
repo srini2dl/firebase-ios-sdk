@@ -57,6 +57,10 @@ ExecutorStd::ExecutorStd(int threads)
 }
 
 ExecutorStd::~ExecutorStd() {
+  Dispose();
+}
+
+void ExecutorStd::Dispose() {
   *shutting_down_ = true;
 
   // Make sure the worker threads are not blocked, so that the call to `join`
@@ -94,10 +98,10 @@ DelayedOperation ExecutorStd::Schedule(const Milliseconds delay,
   const auto id =
       PushOnSchedule(std::move(tagged.operation), now + delay, tagged.tag);
 
-  return DelayedOperation{[this, id] { TryCancel(id); }};
+  return DelayedOperation(this, id);
 }
 
-void ExecutorStd::TryCancel(const Id operation_id) {
+void ExecutorStd::Cancel(const Id operation_id) {
   schedule_.RemoveIf(
       [operation_id](const Entry& e) { return e.id == operation_id; });
 }

@@ -35,8 +35,11 @@ namespace util {
 namespace chr = std::chrono;
 
 using async::Schedule;
+using testutil::Async;
+using testutil::Await;
 using testutil::kTimeout;
 using testutil::Now;
+using testutil::SleepFor;
 
 class ScheduleTest : public ::testing::Test, public testutil::AsyncTest {
  public:

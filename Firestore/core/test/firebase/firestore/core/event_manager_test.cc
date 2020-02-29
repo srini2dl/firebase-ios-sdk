@@ -69,7 +69,7 @@ TEST(EventManagerTest, HandlesManyListnersPerQuery) {
   auto listener2 = NoopQueryListener(query);
 
   StrictMock<MockEventSource> mock_event_source;
-  EXPECT_CALL(mock_event_source, SetCallback(_));
+  EXPECT_CALL(mock_event_source, SetCallback(_)).Times(2);
   EventManager event_manager(&mock_event_source);
 
   EXPECT_CALL(mock_event_source, Listen(query));

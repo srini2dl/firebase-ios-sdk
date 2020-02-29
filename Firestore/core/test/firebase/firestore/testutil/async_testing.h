@@ -52,7 +52,7 @@ std::unique_ptr<util::Executor> ExecutorForTesting(const char* name);
  */
 std::shared_ptr<util::AsyncQueue> AsyncQueueForTesting();
 
-constexpr auto kTimeout = std::chrono::seconds(5);
+constexpr auto kTimeout = std::chrono::seconds(50000);
 
 /**
  * An expected outcome of an asynchronous test.
@@ -97,43 +97,43 @@ class AsyncTest {
  public:
   AsyncTest() = default;
 
-  std::future<void> Async(std::function<void()> action) const;
-
-  /**
-   * Waits for the future to become ready.
-   *
-   * Fails the current test if the timeout occurs.
-   */
-  void Await(const std::future<void>& future,
-             std::chrono::milliseconds timeout = kTimeout) const;
-
-  /**
-   * Waits for the shared future to become ready.
-   *
-   * Fails the current test if the timeout occurs.
-   */
-  void Await(const std::shared_future<void>& future,
-             std::chrono::milliseconds timeout = kTimeout) const;
-
-  /**
-   * Waits for the expectation to become fulfilled.
-   *
-   * Fails the current test if the timeout occurs.
-   */
-  void Await(Expectation& expectation,  // NOLINT(runtime/references)
-             std::chrono::milliseconds timeout = kTimeout) const;
-
-  /**
-   * Sleeps the current thread for the given number of milliseconds.
-   */
-  void SleepFor(int millis) const;
-
  private:
   testing::ScopedTrace trace_{
       "Test case name", 1,
       testing::Message()
           << testing::UnitTest::GetInstance()->current_test_info()->name()};
 };
+
+std::future<void> Async(std::function<void()> action);
+
+/**
+ * Waits for the future to become ready.
+ *
+ * Fails the current test if the timeout occurs.
+ */
+void Await(const std::future<void>& future,
+           std::chrono::milliseconds timeout = kTimeout);
+
+/**
+ * Waits for the shared future to become ready.
+ *
+ * Fails the current test if the timeout occurs.
+ */
+void Await(const std::shared_future<void>& future,
+           std::chrono::milliseconds timeout = kTimeout);
+
+/**
+ * Waits for the expectation to become fulfilled.
+ *
+ * Fails the current test if the timeout occurs.
+ */
+void Await(Expectation& expectation,  // NOLINT(runtime/references)
+           std::chrono::milliseconds timeout = kTimeout);
+
+/**
+ * Sleeps the current thread for the given number of milliseconds.
+ */
+void SleepFor(int millis);
 
 }  // namespace testutil
 }  // namespace firestore

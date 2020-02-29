@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 Google
+ * Copyright 2018 Google LLC
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,6 +22,7 @@
 #include <chrono>  // NOLINT(build/c++11)
 #include <functional>
 #include <memory>
+#include <mutex>  // NOLINT(build/c++11)
 #include <string>
 #include <unordered_map>
 #include <utility>
@@ -40,30 +41,17 @@ namespace firebase {
 namespace firestore {
 namespace util {
 
-namespace internal {
-
-// Generic wrapper over `dispatch_async_f`, providing `dispatch_async`-like
-// interface: accepts an arbitrary invocable object in place of an Objective-C
-// block.
-void DispatchAsync(dispatch_queue_t queue, std::function<void()>&& work);
-
-// Similar to `DispatchAsync` but wraps `dispatch_sync_f`.
-void DispatchSync(dispatch_queue_t queue, std::function<void()> work);
-
-}  // namespace internal
-
+class GroupGuard;
 class TimeSlot;
 
 // A serial queue built on top of libdispatch. The operations are run on
 // a dedicated serial dispatch queue.
 class ExecutorLibdispatch : public Executor {
  public:
-  // An opaque, monotonically increasing identifier for TimeSlots that does
-  // not depend on their address.
-  using TimeSlotId = uint32_t;
-
   explicit ExecutorLibdispatch(dispatch_queue_t dispatch_queue);
   ~ExecutorLibdispatch() override;
+
+  void Dispose() override;
 
   bool IsCurrentExecutor() const override;
   std::string CurrentExecutorName() const override;
@@ -74,26 +62,39 @@ class ExecutorLibdispatch : public Executor {
   DelayedOperation Schedule(Milliseconds delay,
                             TaggedOperation&& operation) override;
 
-  void RemoveFromSchedule(TimeSlotId to_remove);
+  void Cancel(Id to_remove) override;
 
   bool IsScheduled(Tag tag) const override;
   absl::optional<TaggedOperation> PopFromSchedule() override;
 
   dispatch_queue_t dispatch_queue() const {
-    return dispatch_queue_;
+    return queue_;
   }
 
  private:
-  using ScheduleMap = std::unordered_map<TimeSlotId, TimeSlot*>;
+  using ScheduleMap = std::unordered_map<Id, TimeSlot*>;
   using ScheduleEntry = ScheduleMap::value_type;
 
-  TimeSlotId NextId();
+  friend class GroupGuard;
+  friend class TimeSlot;
 
-  dispatch_queue_t dispatch_queue_;
+  void RemoveFromSchedule(Id to_remove);
+
+  void EnterGroup(const char* description);
+  void LeaveGroup(const char* description);
+
+  Id NextId();
+
+  dispatch_group_t group_;
+  std::atomic<int> outstanding_;
+
+  dispatch_queue_t queue_;
+
+  mutable std::mutex mutex_;
   // Stores non-owned pointers to `TimeSlot`s.
   // Invariant: if a `TimeSlot` is in `schedule_`, it's a valid pointer.
   ScheduleMap schedule_;
-  TimeSlotId current_id_ = 0;
+  Id current_id_ = 0;
 };
 
 }  // namespace util
