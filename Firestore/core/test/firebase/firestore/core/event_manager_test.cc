@@ -39,6 +39,7 @@ using model::DocumentSet;
 using model::OnlineState;
 using testing::_;
 using testing::ElementsAre;
+using testing::NiceMock;
 using testing::StrictMock;
 using testutil::Query;
 using util::StatusOr;
@@ -86,7 +87,7 @@ TEST(EventManagerTest, HandlesUnlistenOnUnknownListenerGracefully) {
   core::Query query = Query("foo/bar");
   auto listener = NoopQueryListener(query);
 
-  MockEventSource mock_event_source;
+  NiceMock<MockEventSource> mock_event_source;
   EventManager event_manager(&mock_event_source);
 
   EXPECT_CALL(mock_event_source, StopListening(_)).Times(0);
@@ -122,7 +123,7 @@ TEST(EventManagerTest, NotifiesListenersInTheRightOrder) {
     event_order.push_back("listener3");
   });
 
-  MockEventSource mock_event_source;
+  NiceMock<MockEventSource> mock_event_source;
   EventManager event_manager(&mock_event_source);
 
   EXPECT_CALL(mock_event_source, Listen(query1));
@@ -161,7 +162,7 @@ TEST(EventManagerTest, WillForwardOnlineStateChanges) {
 
   auto fake_listener = std::make_shared<FakeQueryListener>(query);
 
-  MockEventSource mock_event_source;
+  NiceMock<MockEventSource> mock_event_source;
   EventManager event_manager(&mock_event_source);
 
   event_manager.AddQueryListener(fake_listener);
