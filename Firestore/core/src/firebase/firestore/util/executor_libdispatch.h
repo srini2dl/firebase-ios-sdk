@@ -20,11 +20,13 @@
 #include <dispatch/dispatch.h>
 
 #include <chrono>  // NOLINT(build/c++11)
+#include <condition_variable>  // NOLINT(build/c++11)
 #include <functional>
 #include <memory>
 #include <mutex>  // NOLINT(build/c++11)
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
 #include <utility>
 
 #include "Firestore/core/src/firebase/firestore/util/executor.h"
@@ -41,7 +43,7 @@ namespace firebase {
 namespace firestore {
 namespace util {
 
-class GroupGuard;
+class PendingOperation;
 class TimeSlot;
 
 // A serial queue built on top of libdispatch. The operations are run on
@@ -75,22 +77,23 @@ class ExecutorLibdispatch : public Executor {
   using ScheduleMap = std::unordered_map<Id, TimeSlot*>;
   using ScheduleEntry = ScheduleMap::value_type;
 
-  friend class GroupGuard;
+  friend class PendingOperation;
   friend class TimeSlot;
 
   void RemoveFromSchedule(Id to_remove);
 
-  void EnterGroup(const char* description);
-  void LeaveGroup(const char* description);
+  void EnterGroup(PendingOperation* op);
+  void LeaveGroup(PendingOperation* op);
 
   Id NextId();
 
+  mutable std::mutex mutex_;
+
   dispatch_group_t group_;
-  std::atomic<int> outstanding_;
+  std::unordered_set<PendingOperation*> outstanding_;
 
   dispatch_queue_t queue_;
 
-  mutable std::mutex mutex_;
   // Stores non-owned pointers to `TimeSlot`s.
   // Invariant: if a `TimeSlot` is in `schedule_`, it's a valid pointer.
   ScheduleMap schedule_;

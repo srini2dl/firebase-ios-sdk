@@ -71,14 +71,14 @@ cc_select(
 cc_library(
   firebase_firestore_util_base_stdio
   SOURCES
-  stacktrace.cc
-  stacktrace.h
     exception.cc
     exception.h
     hard_assert.cc
     hard_assert.h
     log.h
     log_stdio.cc
+    stacktrace.cc
+    stacktrace.h
     string_format.cc
     string_format.h
     string_win.cc
@@ -100,6 +100,8 @@ cc_library(
     hard_assert.h
     log.h
     log_apple.mm
+    stacktrace.cc
+    stacktrace.h
     string_apple.cc
     string_apple.h
     string_format.cc

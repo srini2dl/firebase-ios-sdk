@@ -20,6 +20,7 @@
 
 #include "Firestore/core/src/firebase/firestore/util/log.h"
 #include "Firestore/core/src/firebase/firestore/util/hard_assert.h"
+#include "Firestore/core/src/firebase/firestore/util/stacktrace.h"
 
 namespace firebase {
 namespace firestore {
@@ -46,6 +47,32 @@ absl::string_view GetCurrentQueueLabel() {
 
 }  // namespace
 
+class PendingOperation {
+ public:
+  PendingOperation(ExecutorLibdispatch* executor, const char* what)
+      : executor_(executor), what_(what) {
+    stacktrace_ = util::GetStackTrace(0);
+    executor_->EnterGroup(this);
+  }
+
+  virtual ~PendingOperation() {
+    executor_->LeaveGroup(this);
+  }
+
+  const char* what() const {
+    return what_;
+  }
+
+  const std::string& stacktrace() const {
+    return stacktrace_;
+  }
+
+ private:
+  ExecutorLibdispatch* executor_;
+  const char* what_;
+  std::string stacktrace_;
+};
+
 // MARK: - TimeSlot
 
 // Represents a "busy" time slot on the schedule.
@@ -70,7 +97,7 @@ absl::string_view GetCurrentQueueLabel() {
 //   The reverse is not true: a canceled time slot is removed from the executor,
 //   but won't be destroyed until its original due time is past.
 
-class TimeSlot {
+class TimeSlot : public PendingOperation {
  public:
   TimeSlot(ExecutorLibdispatch* executor,
            Executor::Milliseconds delay,
@@ -132,13 +159,13 @@ TimeSlot::TimeSlot(ExecutorLibdispatch* executor,
                    const Executor::Milliseconds delay,
                    Executor::TaggedOperation&& operation,
                    Executor::Id slot_id)
-    : executor_{executor},
+    : PendingOperation(executor, "TimeSlot"),
+      executor_{executor},
       target_time_{std::chrono::time_point_cast<Executor::Milliseconds>(
                        std::chrono::steady_clock::now()) +
                    delay},
       tagged_{std::move(operation)},
       time_slot_id_{slot_id} {
-  executor->EnterGroup("TimeSlot");
 }
 
 TimeSlot::~TimeSlot() {
@@ -165,7 +192,7 @@ void TimeSlot::InvokedByLibdispatch(void* raw_self) {
 
 void TimeSlot::MarkDoneLocked() {
   if (!done_) {
-    executor_->LeaveGroup("TimeSlot");
+    executor_->LeaveGroup(this);
   }
   done_ = true;
 }
@@ -193,26 +220,10 @@ void TimeSlot::RemoveFromScheduleLocked() {
 
 // MARK: - GroupGuard
 
-class GroupGuard {
- public:
-  explicit GroupGuard(ExecutorLibdispatch* executor, const char* what)
-      : executor_(executor), what_(what) {
-    executor_->EnterGroup(what_);
-  }
-
-  ~GroupGuard() {
-    executor_->LeaveGroup(what_);
-  }
-
- private:
-  ExecutorLibdispatch* executor_;
-  const char* what_;
-};
-
-class GroupGuardedOperation : public GroupGuard {
+class GroupGuardedOperation : public PendingOperation {
  public:
   GroupGuardedOperation(ExecutorLibdispatch* executor, const char* what, Executor::Operation&& operation)
-      : GroupGuard(executor, what), operation_(std::move(operation)) {
+      : PendingOperation(executor, what), operation_(std::move(operation)) {
   }
 
   void Invoke() {
@@ -227,7 +238,6 @@ class GroupGuardedOperation : public GroupGuard {
 
 ExecutorLibdispatch::ExecutorLibdispatch(const dispatch_queue_t dispatch_queue)
     : group_(dispatch_group_create()), queue_{dispatch_queue} {
-  outstanding_ = 0;
 }
 
 ExecutorLibdispatch::~ExecutorLibdispatch() {
@@ -235,23 +245,27 @@ ExecutorLibdispatch::~ExecutorLibdispatch() {
 }
 
 void ExecutorLibdispatch::Dispose() {
-  {
-    std::lock_guard<std::mutex> lock(mutex_);
+  std::lock_guard<std::mutex> lock(mutex_);
 
-    // Turn any operations that might still be in the queue into no-ops, lest
-    // they try to access `ExecutorLibdispatch` after it gets destroyed. Because
-    // the queue is serial, by the time libdispatch gets to the newly-enqueued
-    // work, the pending operations that might have been in progress would have
-    // already finished.
-    // Note: this is thread-safe, because the underlying variable `done_` is
-    // atomic. `DispatchSync` may result in a deadlock.
-    for (const auto& entry : schedule_) {
-      entry.second->MarkDone();
-    }
+  // Turn any operations that might still be in the queue into no-ops, lest
+  // they try to access `ExecutorLibdispatch` after it gets destroyed. Because
+  // the queue is serial, by the time libdispatch gets to the newly-enqueued
+  // work, the pending operations that might have been in progress would have
+  // already finished.
+  // Note: this is thread-safe, because the underlying variable `done_` is
+  // atomic. `DispatchSync` may result in a deadlock.
+  for (const auto& entry : schedule_) {
+    entry.second->MarkDone();
   }
 
   LOG_DEBUG("Executor(%s): Awaiting group: %s (outstanding: %s)",
-            this, GetCurrentQueueLabel(), outstanding_);
+            this, GetCurrentQueueLabel(), outstanding_.size());
+
+  for (PendingOperation* op : outstanding_) {
+    LOG_DEBUG("Executor(%s): Missing from group: %s %s, %s\n\n%s\n\n",
+        this, GetCurrentQueueLabel(), op, op->what(), op->stacktrace());
+  }
+
   dispatch_group_wait(group_, DISPATCH_TIME_FOREVER);
 }
 
@@ -277,7 +291,7 @@ void ExecutorLibdispatch::Execute(Operation&& operation) {
   });
 }
 void ExecutorLibdispatch::ExecuteBlocking(Operation&& operation) {
-  GroupGuard guard(this, "ExecuteBlocking");
+  PendingOperation guard(this, "ExecuteBlocking");
 
   if (GetCurrentQueueLabel() == GetQueueLabel(queue_)) {
     // dispatch_sync_f will deadlock if you try to dispatch an operation to a
@@ -380,18 +394,22 @@ ExecutorLibdispatch::PopFromSchedule() {
   return {std::move(operation)};
 }
 
-void ExecutorLibdispatch::EnterGroup(const char* what) {
+void ExecutorLibdispatch::EnterGroup(PendingOperation* op) {
   dispatch_group_enter(group_);
-  outstanding_ += 1;
-  LOG_DEBUG("Executor(%s): Enter group: %s, %s (outstanding: %s)",
-      this, GetCurrentQueueLabel(), what, outstanding_);
+  outstanding_.insert(op);
+  LOG_DEBUG("Executor(%s): Enter group: %s, %s %s (outstanding: %s), %s",
+      this, GetCurrentQueueLabel(), op, op->what(), outstanding_.size(),
+      [group_ debugDescription]);
 }
 
-void ExecutorLibdispatch::LeaveGroup(const char* what) {
-  dispatch_group_leave(group_);
-  outstanding_ -= 1;
-  LOG_DEBUG("Executor(%s): Leave group: %s, %s (outstanding: %s)",
-      this, GetCurrentQueueLabel(), what, outstanding_);
+void ExecutorLibdispatch::LeaveGroup(PendingOperation* op) {
+  size_t erased = outstanding_.erase(op);
+  if (erased > 0) {
+    dispatch_group_leave(group_);
+  }
+  LOG_DEBUG("Executor(%s): Leave group: %s, %s %s (outstanding: %s), %s",
+      this, GetCurrentQueueLabel(), op, op->what(), outstanding_.size(),
+      [group_ debugDescription]);
 }
 
 Executor::Id ExecutorLibdispatch::NextId() {

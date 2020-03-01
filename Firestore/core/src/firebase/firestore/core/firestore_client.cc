@@ -262,7 +262,10 @@ void FirestoreClient::TerminateAsync(StatusCallback callback) {
     shared_this->TerminateInternal();
 
     if (callback) {
-      shared_this->user_executor()->Execute([=] { callback(Status::OK()); });
+      const auto& executor = shared_this->user_executor();
+      executor->Execute([=] {
+        callback(Status::OK());
+      });
     }
   });
 }
