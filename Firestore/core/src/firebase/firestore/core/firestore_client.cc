@@ -279,10 +279,11 @@ void FirestoreClient::Dispose() {
   // does not rely on any state in this FirestoreClient.
   worker_queue_->EnqueueEvenWhileRestricted([&, this] { TerminateInternal(); });
 
+  user_executor_->Dispose();
+
   // Atomically stop accepting any new tasks and wait for all pending tasks to
   // complete.
   worker_queue_->Dispose();
-  user_executor_->Dispose();
 }
 
 void FirestoreClient::TerminateInternal() {

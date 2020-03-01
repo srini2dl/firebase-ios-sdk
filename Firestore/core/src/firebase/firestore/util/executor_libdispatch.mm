@@ -49,16 +49,20 @@ absl::string_view GetCurrentQueueLabel() {
 
 class PendingOperation {
  public:
-  PendingOperation(ExecutorLibdispatch* executor, const char* what)
-      : executor_(executor), what_(what) {
+  PendingOperation(const char* what)
+#if FIRESTORE_EXECUTOR_DEBUG
+      : what_(what) {
     stacktrace_ = util::GetStackTrace(0);
-    executor_->EnterGroup(this);
   }
-
-  virtual ~PendingOperation() {
-    executor_->LeaveGroup(this);
+#else
+  {
+    (void)what;
   }
+#endif
 
+  virtual ~PendingOperation() = default;
+
+#if FIRESTORE_EXECUTOR_DEBUG
   const char* what() const {
     return what_;
   }
@@ -68,9 +72,10 @@ class PendingOperation {
   }
 
  private:
-  ExecutorLibdispatch* executor_;
   const char* what_;
+
   std::string stacktrace_;
+#endif
 };
 
 // MARK: - TimeSlot
@@ -159,17 +164,18 @@ TimeSlot::TimeSlot(ExecutorLibdispatch* executor,
                    const Executor::Milliseconds delay,
                    Executor::TaggedOperation&& operation,
                    Executor::Id slot_id)
-    : PendingOperation(executor, "TimeSlot"),
+    : PendingOperation("TimeSlot"),
       executor_{executor},
       target_time_{std::chrono::time_point_cast<Executor::Milliseconds>(
                        std::chrono::steady_clock::now()) +
                    delay},
       tagged_{std::move(operation)},
       time_slot_id_{slot_id} {
+  executor_->EnterGroup(this);
 }
 
 TimeSlot::~TimeSlot() {
-  HARD_ASSERT_NOTHROW(done_);
+  MarkDone();
 }
 
 Executor::TaggedOperation TimeSlot::RemoveOperation() {
@@ -223,7 +229,12 @@ void TimeSlot::RemoveFromScheduleLocked() {
 class GroupGuardedOperation : public PendingOperation {
  public:
   GroupGuardedOperation(ExecutorLibdispatch* executor, const char* what, Executor::Operation&& operation)
-      : PendingOperation(executor, what), operation_(std::move(operation)) {
+      : PendingOperation(what), executor_(executor), operation_(std::move(operation)) {
+    executor_->EnterGroup(this);
+  }
+
+  ~GroupGuardedOperation() {
+    executor_->LeaveGroup(this);
   }
 
   void Invoke() {
@@ -231,6 +242,7 @@ class GroupGuardedOperation : public PendingOperation {
   }
 
  private:
+  ExecutorLibdispatch* executor_;
   Executor::Operation operation_;
 };
 
@@ -247,6 +259,8 @@ ExecutorLibdispatch::~ExecutorLibdispatch() {
 void ExecutorLibdispatch::Dispose() {
   std::lock_guard<std::mutex> lock(mutex_);
 
+  disposed_ = true;
+
   // Turn any operations that might still be in the queue into no-ops, lest
   // they try to access `ExecutorLibdispatch` after it gets destroyed. Because
   // the queue is serial, by the time libdispatch gets to the newly-enqueued
@@ -261,10 +275,12 @@ void ExecutorLibdispatch::Dispose() {
   LOG_DEBUG("Executor(%s): Awaiting group: %s (outstanding: %s)",
             this, GetCurrentQueueLabel(), outstanding_.size());
 
+#if FIRESTORE_EXECUTOR_DEBUG
   for (PendingOperation* op : outstanding_) {
     LOG_DEBUG("Executor(%s): Missing from group: %s %s, %s\n\n%s\n\n",
         this, GetCurrentQueueLabel(), op, op->what(), op->stacktrace());
   }
+#endif
 
   dispatch_group_wait(group_, DISPATCH_TIME_FOREVER);
 }
@@ -280,6 +296,11 @@ std::string ExecutorLibdispatch::Name() const {
 }
 
 void ExecutorLibdispatch::Execute(Operation&& operation) {
+  {
+    std::lock_guard<std::mutex> lock(mutex_);
+    if (disposed_) return;
+  }
+
   // Dynamically allocate the function to make sure the object is valid by the
   // time libdispatch gets to it.
   const auto wrap = new GroupGuardedOperation(this, "Execute", std::move(operation));
@@ -291,19 +312,24 @@ void ExecutorLibdispatch::Execute(Operation&& operation) {
   });
 }
 void ExecutorLibdispatch::ExecuteBlocking(Operation&& operation) {
-  PendingOperation guard(this, "ExecuteBlocking");
+  {
+    std::lock_guard<std::mutex> lock(mutex_);
+    if (disposed_) return;
+  }
+
+  GroupGuardedOperation guard(this, "ExecuteBlocking", std::move(operation));
 
   if (GetCurrentQueueLabel() == GetQueueLabel(queue_)) {
     // dispatch_sync_f will deadlock if you try to dispatch an operation to a
     // queue from which you're currently running.
-    operation();
+    guard.Invoke();
 
   } else {
     // Unlike dispatch_async_f, dispatch_sync_f blocks until the work passed to
     // it is done, so passing a reference to a local variable is okay.
-    dispatch_sync_f(queue_, &operation, [](void* const raw_work) {
-      const auto unwrap = static_cast<std::function<void()>*>(raw_work);
-      (*unwrap)();
+    dispatch_sync_f(queue_, &guard, [](void* const raw_work) {
+      const auto unwrap = static_cast<GroupGuardedOperation*>(raw_work);
+      unwrap->Invoke();
     });
   }
 }
@@ -323,6 +349,10 @@ DelayedOperation ExecutorLibdispatch::Schedule(const Milliseconds delay,
   Id time_slot_id = 0;
   {
     std::lock_guard<std::mutex> lock(mutex_);
+
+    if (disposed_) {
+      return DelayedOperation();
+    }
 
     time_slot_id = NextId();
     time_slot = new TimeSlot{this, delay, std::move(operation), time_slot_id};
@@ -396,20 +426,30 @@ ExecutorLibdispatch::PopFromSchedule() {
 
 void ExecutorLibdispatch::EnterGroup(PendingOperation* op) {
   dispatch_group_enter(group_);
+
+#if FIRESTORE_EXECUTOR_DEBUG
   outstanding_.insert(op);
   LOG_DEBUG("Executor(%s): Enter group: %s, %s %s (outstanding: %s), %s",
       this, GetCurrentQueueLabel(), op, op->what(), outstanding_.size(),
       [group_ debugDescription]);
+#else
+  (void)op;
+#endif
 }
 
 void ExecutorLibdispatch::LeaveGroup(PendingOperation* op) {
+  dispatch_group_leave(group_);
+
+#if FIRESTORE_EXECUTOR_DEBUG
   size_t erased = outstanding_.erase(op);
-  if (erased > 0) {
-    dispatch_group_leave(group_);
-  }
+  HARD_ASSERT(erased > 0);
+
   LOG_DEBUG("Executor(%s): Leave group: %s, %s %s (outstanding: %s), %s",
       this, GetCurrentQueueLabel(), op, op->what(), outstanding_.size(),
       [group_ debugDescription]);
+#else
+  (void)op;
+#endif
 }
 
 Executor::Id ExecutorLibdispatch::NextId() {

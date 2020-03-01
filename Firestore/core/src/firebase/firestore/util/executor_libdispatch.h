@@ -39,10 +39,13 @@
 #error "This header only supports Objective-C++ (see comment for more info)."
 #endif  // !defined(__OBJC__)
 
+#define FIRESTORE_EXECUTOR_DEBUG 0
+
 namespace firebase {
 namespace firestore {
 namespace util {
 
+class GroupGuardedOperation;
 class PendingOperation;
 class TimeSlot;
 
@@ -77,7 +80,7 @@ class ExecutorLibdispatch : public Executor {
   using ScheduleMap = std::unordered_map<Id, TimeSlot*>;
   using ScheduleEntry = ScheduleMap::value_type;
 
-  friend class PendingOperation;
+  friend class GroupGuardedOperation;
   friend class TimeSlot;
 
   void RemoveFromSchedule(Id to_remove);
@@ -88,6 +91,7 @@ class ExecutorLibdispatch : public Executor {
   Id NextId();
 
   mutable std::mutex mutex_;
+  bool disposed_ = false;
 
   dispatch_group_t group_;
   std::unordered_set<PendingOperation*> outstanding_;

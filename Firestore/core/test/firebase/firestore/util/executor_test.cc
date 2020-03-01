@@ -78,7 +78,7 @@ TEST_P(ExecutorTest, CanScheduleOperationsInTheFuture) {
   std::string steps;
   Expectation ran;
   executor->Execute([&steps] { steps += '1'; });
-  Schedule(executor.get(), Executor::Milliseconds(20), [&] {
+  Schedule(executor.get(), Executor::Milliseconds(50), [&] {
     steps += '4';
     ran.Fulfill();
   });
