@@ -26,6 +26,7 @@ static NSInteger const SuccessHTTPStatusCode = 200;
 
 @interface FIRIAMMessageContentDataWithImageURL ()
 @property(nonatomic, readwrite, nonnull, copy) NSString *titleText;
+@property(nonatomic, readwrite, nonnull, copy) NSArray *localizationArray;
 @property(nonatomic, readwrite, nonnull, copy) NSString *bodyText;
 @property(nonatomic, copy, nullable) NSString *actionButtonText;
 @property(nonatomic, copy, nullable) NSString *secondaryActionButtonText;
@@ -39,6 +40,7 @@ static NSInteger const SuccessHTTPStatusCode = 200;
 @implementation FIRIAMMessageContentDataWithImageURL
 - (instancetype)initWithMessageTitle:(NSString *)title
                          messageBody:(NSString *)body
+                       localizationArray:(NSArray *) localizationArray
                     actionButtonText:(nullable NSString *)actionButtonText
            secondaryActionButtonText:(nullable NSString *)secondaryActionButtonText
                            actionURL:(nullable NSURL *)actionURL
@@ -55,7 +57,7 @@ static NSInteger const SuccessHTTPStatusCode = 200;
     _secondaryActionButtonText = secondaryActionButtonText;
     _actionURL = actionURL;
     _secondaryActionURL = secondaryActionURL;
-
+    _localizationArray = localizationArray;
     if (imageURL) {
       _URLSession = URLSession ? URLSession : [NSURLSession sharedSession];
     }

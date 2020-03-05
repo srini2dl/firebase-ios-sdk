@@ -22,6 +22,7 @@ NS_ASSUME_NONNULL_BEGIN
  */
 @protocol FIRIAMMessageContentData
 @property(nonatomic, readonly, nonnull) NSString *titleText;
+@property(nonatomic, readonly, nonnull) NSArray *localizationArray;
 @property(nonatomic, readonly, nonnull) NSString *bodyText;
 @property(nonatomic, readonly, nullable) NSString *actionButtonText;
 @property(nonatomic, readonly, nullable) NSString *secondaryActionButtonText;

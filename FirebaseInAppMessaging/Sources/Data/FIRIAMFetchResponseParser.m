@@ -189,13 +189,14 @@
         *secondaryActionURLStr, *actionButtonText, *secondaryActionButtonText;
     title = body = imageURLStr = landscapeImageURLStr = actionButtonText =
         secondaryActionButtonText = actionURLStr = secondaryActionURLStr = nil;
-
+      NSArray *localizationArray = nil;
     // TODO: Refactor this giant if-else block into separate parsing methods per message type.
     if ([content[@"banner"] isKindOfClass:[NSDictionary class]]) {
       NSDictionary *bannerNode = (NSDictionary *)contentNode[@"banner"];
       mode = FIRIAMRenderAsBannerView;
 
       title = bannerNode[@"title"][@"text"];
+      localizationArray = bannerNode[@"localizations"];
       titleTextColor = [UIColor firiam_colorWithHexString:bannerNode[@"title"][@"hexColor"]];
 
       body = bannerNode[@"body"][@"text"];
@@ -210,6 +211,7 @@
 
       NSDictionary *modalNode = (NSDictionary *)contentNode[@"modal"];
       title = modalNode[@"title"][@"text"];
+      localizationArray = modalNode[@"localizations"];
       titleTextColor = [UIColor firiam_colorWithHexString:modalNode[@"title"][@"hexColor"]];
 
       body = modalNode[@"body"][@"text"];
@@ -238,6 +240,9 @@
       mode = FIRIAMRenderAsCardView;
       NSDictionary *cardNode = (NSDictionary *)contentNode[@"card"];
       title = cardNode[@"title"][@"text"];
+      if ([cardNode[@"body"][@"localizations"]isKindOfClass:[NSArray class]]) {
+            localizationArray = cardNode[@"body"][@"localizations"];
+      }
       titleTextColor = [UIColor firiam_colorWithHexString:cardNode[@"title"][@"hexColor"]];
 
       body = cardNode[@"body"][@"text"];
@@ -322,6 +327,7 @@
     FIRIAMMessageContentDataWithImageURL *msgData =
         [[FIRIAMMessageContentDataWithImageURL alloc] initWithMessageTitle:title
                                                                messageBody:body
+                                                         localizationArray:localizationArray
                                                           actionButtonText:actionButtonText
                                                  secondaryActionButtonText:secondaryActionButtonText
                                                                  actionURL:actionURL

@@ -446,7 +446,8 @@
           backgroundColor:renderData.renderingEffectSettings.displayBGColor
       primaryActionButton:primaryActionButton
          primaryActionURL:definition.renderData.contentData.actionURL
-                  appData:definition.appData];
+                  appData:definition.appData
+            localizationArray:renderData.contentData.localizationArray];
 
   cardMessage.body = body;
   cardMessage.landscapeImageData = landscapeImageData;

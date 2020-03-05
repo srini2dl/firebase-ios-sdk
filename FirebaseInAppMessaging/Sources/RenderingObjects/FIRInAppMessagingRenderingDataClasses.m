@@ -86,7 +86,8 @@
                   backgroundColor:(UIColor *)backgroundColor
               primaryActionButton:(FIRInAppMessagingActionButton *)primaryActionButton
                  primaryActionURL:(NSURL *)primaryActionURL
-                          appData:(NSDictionary *)appData {
+                          appData:(NSDictionary *)appData
+                    localizationArray:(NSArray *) localizationArray{
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdeprecated-declarations"
   if (self = [super initWithMessageID:messageID
@@ -98,6 +99,7 @@
 #pragma clang diagnostic pop
     _title = title;
     _textColor = textColor;
+    _localizationArray = localizationArray;
     _portraitImageData = portraitImageData;
     _displayBackgroundColor = backgroundColor;
     _primaryActionButton = primaryActionButton;

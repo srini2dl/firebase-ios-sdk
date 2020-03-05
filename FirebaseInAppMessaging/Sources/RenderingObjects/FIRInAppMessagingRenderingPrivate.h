@@ -33,7 +33,8 @@ NS_ASSUME_NONNULL_BEGIN
                   backgroundColor:(UIColor *)backgroundColor
               primaryActionButton:(FIRInAppMessagingActionButton *)primaryActionButton
                  primaryActionURL:(nullable NSURL *)primaryActionURL
-                          appData:(NSDictionary *)appData;
+                          appData:(NSDictionary *)appData
+                    localizationArray:(NSArray *) localizationArray;
 
 @end
 

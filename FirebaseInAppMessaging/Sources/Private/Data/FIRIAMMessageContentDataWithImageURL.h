@@ -39,6 +39,7 @@ NS_ASSUME_NONNULL_BEGIN
  */
 - (instancetype)initWithMessageTitle:(NSString *)title
                          messageBody:(NSString *)body
+                        localizationArray:(NSArray *) localizationArray
                     actionButtonText:(nullable NSString *)actionButtonText
            secondaryActionButtonText:(nullable NSString *)secondaryActionButtonText
                            actionURL:(nullable NSURL *)actionURL

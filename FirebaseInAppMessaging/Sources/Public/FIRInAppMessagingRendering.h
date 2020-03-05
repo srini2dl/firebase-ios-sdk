@@ -189,6 +189,11 @@ NS_SWIFT_NAME(InAppMessagingCardDisplay)
 @property(nonatomic, nonnull, copy, readonly) NSString *title;
 
 /**
+* Gets the localization array for a card FIAM message.
+*/
+@property(nonatomic, nonnull, copy, readonly) NSArray *localizationArray;
+
+/**
  * Gets the body text for a card FIAM message.
  */
 @property(nonatomic, nullable, copy, readonly) NSString *body;
